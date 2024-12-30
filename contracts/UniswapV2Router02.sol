@@ -209,30 +209,108 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
     // **** SWAP ****
     // requires the initial amount to have already been sent to the first pair
-    function _swap(uint[] memory amounts, address[] memory path, address _to) internal virtual {
-        for (uint i; i < path.length - 1; i++) {
-            (address input, address output) = (path[i], path[i + 1]);
-            (address token0,) = UniswapV2Library.sortTokens(input, output);
-            uint amountOut = amounts[i + 1];
-            (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-            address to = i < path.length - 2 ? UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
-            IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output)).swap(
-                amount0Out, amount1Out, to, new bytes(0)
-            );
-        }
-    }
-    function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
-        amounts = UniswapV2Library.getAmountsOut(factory, amountIn, path);
-        require(amounts[amounts.length - 1] >= amountOutMin, 'UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
-        TransferHelper.safeTransferFrom(
-            path[0], msg.sender, UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]
+function _swap(uint[] memory amounts, address[] memory path, address _to) internal virtual {
+    /**
+     * @dev Core swap function that executes multi-hop trades
+     * @param amounts Array where:
+     *        - amounts[0]: Input amount
+     *        - amounts[1..n-1]: Intermediate amounts
+     *        - amounts[n]: Final output amount
+     * @param path Array of token addresses defining swap route
+     * @param _to Recipient of final output tokens
+     *
+     * Path Mechanics Example:
+     * For path [USDC -> WETH -> DAI]:
+     * i=0: USDC -> WETH swap
+     * i=1: WETH -> DAI swap
+     */
+
+    for (uint i; i < path.length - 1; i++) {
+        // Setup current swap pair
+        (address input, address output) = (path[i], path[i + 1]);
+
+        /**
+         * Token Sorting:
+         * - Required for deterministic pair addresses via CREATE2
+         * - Ensures same pair address regardless of input order
+         * Example: 
+         * - Pair(WETH, USDC) and Pair(USDC, WETH) must resolve to same address
+         */
+        // https://ethereum.stackexchange.com/questions/101815/why-we-sort-tokens-in-uniswap-functions
+
+        (address token0,) = UniswapV2Library.sortTokens(input, output);
+
+        // Calculate output for current hop
+        uint amountOut = amounts[i + 1];
+
+        /**
+         * Amount Distribution Logic:
+         * If input == token0:
+         *   amount0Out = 0, amount1Out = amountOut (swapping token0 for token1)
+         * Else:
+         *   amount0Out = amountOut, amount1Out = 0 (swapping token1 for token0)
+         */
+        (uint amount0Out, uint amount1Out) = input == token0 ? 
+            (uint(0), amountOut) : (amountOut, uint(0));
+
+        /**
+         * Routing Logic:
+         * Mid-path: Route to next pair contract
+         * Final hop: Route to specified recipient (_to)
+         */
+        address to = i < path.length - 2 ? 
+            UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
+
+        // Execute swap on current pair
+        IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output)).swap(
+            amount0Out,    // Amount of token0 to output
+            amount1Out,    // Amount of token1 to output
+            to,           // Recipient address
+            new bytes(0)  // No callback data needed
         );
+    }
+}
+    // Swaps all input for max output
+    // Swaps all the dx tokens for dy tokens,
+
+    function swapExactTokensForTokens(
+        uint amountIn, // dx
+        uint amountOutMin, // slippage in terms of dy
+        address[] calldata path, // path to choose, you can give custom path as well
+        address to, // to whom you want to send the output dy
+        uint deadline // a deadline to make sure the transaction is done in time, and not waited in blocks
+    ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
+        // Calculates the amount out given the factory, amount in and the path
+
+        // retuns a array 
+
+        // amounts[0]=input, amount[last]=amount, amounts[rest]=intermediate outputs, this is for the transfer if there are multiple paths which must be taken to perform a swap 
+
+        // e.g : if you want to swap from A->B->C->D, then the amounts[0+1, last-1] array will have the following values
+        amounts = UniswapV2Library.getAmountsOut(factory, amountIn, path);
+
+        // Checks for slippage, checks if amount which can be withdrawn is bigger than the slippage specified by the user
+        require(amounts[amounts.length - 1] >= amountOutMin, 'UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
+
+        // Transfer the input amount to the pair
+
+        // Params
+
+        
+        // address token,
+        // address from,
+        // address to,
+        // uint256 value
+
+        // @note : Here we are directly transfering the tokens to the pair contract, instead of pair contract taking the tokens from the msg.sender
+        TransferHelper.safeTransferFrom(
+            path[0] // address of the token to trasnfer from
+            , msg.sender // from where to transfer the amount
+            // we are transfering the tokens directly to the pair contract formed by the tokens in path[0] and path[1]
+            , UniswapV2Library.pairFor(factory, path[0], path[1]) // what pair contract to transfer the amounts, here we are using create2 opcode to get the pair address of a contract
+            , amounts[0] // as per the array, the first amount is the input amount
+        );
+        // now we call the swap function 
         _swap(amounts, path, to);
     }
     function swapTokensForExactTokens(
