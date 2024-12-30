@@ -313,15 +313,30 @@ function _swap(uint[] memory amounts, address[] memory path, address _to) intern
         // now we call the swap function 
         _swap(amounts, path, to);
     }
+
+    // if you want to swap a minimum amount of tokens for a fixed amount of tokens
+    // If getting 1 WETH would result in spending more than 3,000 DAI, this function will revert.
+    // swap min input for specified output
+
+
     function swapTokensForExactTokens(
-        uint amountOut,
-        uint amountInMax,
-        address[] calldata path,
-        address to,
-        uint deadline
+        uint amountOut, // The exact amount of output tokens you want to receive
+        uint amountInMax, //  The maximum amount of input tokens you're willing to provide // this also acts a slipage protection up here
+        address[] calldata path, // The token swap path (e.g., [tokenIn, tokenOut])
+        address to, // The address to receive the output tokens
+        uint deadline // The transaction deadline (timestamp)
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
+
+        // Get the amount of input tokens required to get the specified output tokens
+
+        // amounts is a uint256 arry where amounts[0] is the input amount, and amounts[last] is the output amount and amounts[1, last-1] are the intermediate amounts for performing swaps between different path ways
         amounts = UniswapV2Library.getAmountsIn(factory, amountOut, path);
+
+        // Ensure that the amount of input tokens required is less than or equal to the maximum amount of input tokens specified
         require(amounts[0] <= amountInMax, 'UniswapV2Router: EXCESSIVE_INPUT_AMOUNT');
+
+        // as usual, transfer the input tokens to the pair contract between the pair[0] and pair[1]
+        
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]
         );

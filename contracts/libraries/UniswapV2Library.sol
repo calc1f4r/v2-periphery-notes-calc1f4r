@@ -113,7 +113,7 @@ library UniswapV2Library {
         // dy= dx*997*x/1000(x+dx(997))
 
 
-        
+
         // dy=amountin*997*reserveout / 1000(reserveIn+amountInwithcutfees))
 
 
@@ -197,10 +197,12 @@ library UniswapV2Library {
         // Set the last element of amounts to the desired output amount
         amounts[amounts.length - 1] = amountOut;
         // Iterate through each pair of tokens in the path in reverse order
+
+        // 
         for (uint i = path.length - 1; i > 0; i--) {
             // Retrieve reserves for the current pair
             (uint reserveIn, uint reserveOut) = getReserves(factory, path[i - 1], path[i]);
-            // Calculate the required input amount for the current pair and assign it to the previous index
+            // Calculate the required input amount for the current pair and assign it to the previous index, sets the amount to swap to get the next token
             amounts[i - 1] = getAmountIn(amounts[i], reserveIn, reserveOut);
         }
     }
