@@ -140,9 +140,17 @@ library UniswapV2Library {
         require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
         // Ensure reserves are sufficient to perform the calculation
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
+
+        // amountIn=((reserveIn*amountOut*1000)/(reserveOut-amountOut)*997 ) + 1
+
+
+
+
         // Calculate the numerator for the input amount formula
         uint numerator = reserveIn.mul(amountOut).mul(1000);
         // Calculate the denominator for the input amount formula
+
+        // (reserveout - amountout )* 997 
         uint denominator = reserveOut.sub(amountOut).mul(997);
         // Determine the input amount by dividing numerator by denominator and adding 1 to account for rounding
         amountIn = (numerator / denominator).add(1);
@@ -203,6 +211,15 @@ library UniswapV2Library {
             // Retrieve reserves for the current pair
             (uint reserveIn, uint reserveOut) = getReserves(factory, path[i - 1], path[i]);
             // Calculate the required input amount for the current pair and assign it to the previous index, sets the amount to swap to get the next token
+
+
+            // NOTE
+
+            // i | output amount | input amount 
+            // n-1 | amounts[n-1] | amounts[n-2]
+            //  n  | amounts[n]   | amounts[n-1]
+            // 2 | amounts[2] | amounts[1]
+            // 1 | amounts[1] | amounts[0]
             amounts[i - 1] = getAmountIn(amounts[i], reserveIn, reserveOut);
         }
     }
